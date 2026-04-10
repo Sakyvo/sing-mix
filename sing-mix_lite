@@ -4,6 +4,8 @@
 const BYPASS_DOMAINS = [
   "example.com", "none.com"
 ];
+// 更建议使用代理软件自带的过滤
+// 脚本更新会导致该部分配置丢失
 
 // ====================
 // 1. 常量配置
@@ -19,18 +21,18 @@ const SETTINGS = {
     interval: 900,
     tolerance: 50,
     lazy: true,
-    timeout: 3000
+    timeout: 2000
   },
 
-  // BetterFB 本质仍是 url-test，只是把 tolerance 提高到 3000。
+  // BetterFB 本质仍是 url-test，只是把 tolerance 提高到 1000。
   // 这样会继续自动选择低延迟节点，但只有在延迟差距足够大时才切换，稳定性更接近 fallback。
   BETTER_FB_EXTRA: {
     hidden: true,
     url: "https://www.gstatic.com/generate_204",
     interval: 900,
-    tolerance: 3000,
+    tolerance: 1000,
     lazy: true,
-    timeout: 3000
+    timeout: 1000
   },
 
   FILTER_REGEX: /群|邀请|返利|官网|官方|网址|订阅|购买|续费|剩余|到期|过期|流量|备用|邮箱|客服|联系|工单|倒卖|防止|梯子|tg|telegram|电报|发布|重置/i
@@ -218,14 +220,21 @@ const buildProxyGroups = ({ allNames, aiNames, infoNames }) => {
     add("AI", "select", ["BetterFB - AI", "URL Test - AI", ...aiNames], "ChatGPT.png");
   }
 
+  // 被 FILTER_REGEX 命中的节点只进入 Info，不参与 URL Test / BetterFB
+  if (infoNames.length) {
+    add("Info", "select", infoNames, "Available.png");
+  }
+
   add(
     "GLOBAL",
     "select",
-    [...(allNames.length ? ["全部"] : []), ...(aiNames.length ? ["AI"] : [])],
+    [
+      ...(allNames.length ? ["全部"] : []),
+      ...(aiNames.length ? ["AI"] : []),
+      ...(infoNames.length ? ["Info"] : [])
+    ],
     "Global.png"
   );
-
-  if (infoNames.length) add("Info", "select", infoNames, "Available.png");
 
   return groups;
 };
@@ -345,7 +354,8 @@ function main(config) {
       SETTINGS.FILTER_REGEX
     );
 
-    const baseProxies = normalProxies.length ? normalProxies : originalProxies;
+    // 被 filter 的节点不再混入 normal 分组，只进入 Info
+    const baseProxies = normalProxies;
     const allNames = uniq(baseProxies.map((p) => p.name));
     const infoNames = uniq(infoProxies.map((p) => p.name));
     const aiNames = buildAiProxyList(allNames);
