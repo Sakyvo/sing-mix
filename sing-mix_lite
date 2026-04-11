@@ -17,18 +17,18 @@ const SETTINGS = {
 
   URL_TEST_EXTRA: {
     hidden: true,
-    url: "https://www.gstatic.com/generate_204",
+    url: "https://www.g.cn/generate_204",
     interval: 900,
     tolerance: 50,
     lazy: true,
-    timeout: 2000
+    timeout: 1000
   },
 
   // BetterFB 本质仍是 url-test，只是把 tolerance 提高到 1000。
   // 这样会继续自动选择低延迟节点，但只有在延迟差距足够大时才切换，稳定性更接近 fallback。
   BETTER_FB_EXTRA: {
     hidden: true,
-    url: "https://www.gstatic.com/generate_204",
+    url: "https://www.g.cn/generate_204",
     interval: 900,
     tolerance: 1000,
     lazy: true,
@@ -129,6 +129,7 @@ const STATIC_RULES = [
   "GEOSITE,openai,AI",
   "GEOSITE,anthropic,AI",
   "GEOSITE,google-gemini,AI",
+  "GEOSITE,xai,AI",
 
   // 兜底分流
   "GEOSITE,gfw,全部",
@@ -308,10 +309,11 @@ const applyDns = (cfg) => {
       "geosite:synology": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
 
       // AI 分流 DNS
-      "geosite:openai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-      "geosite:anthropic": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-      "geosite:google-gemini": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"]
-    },
+"geosite:openai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+"geosite:anthropic": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+"geosite:google-gemini": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+"geosite:xai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"]
+},
     nameserver: ["https://1.1.1.1/dns-query#全部", "https://8.8.8.8/dns-query#全部"],
     "proxy-server-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
     "direct-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
