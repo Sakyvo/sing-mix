@@ -15,6 +15,8 @@ const SETTINGS = {
   GEOIP_URL: "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat",
   GEOSITE_URL: "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat",
 
+  REGION_ORDER: ["HK", "TW", "SG", "JP", "KR", "AS", "US"],
+
   URL_TEST_EXTRA: {
     hidden: true,
     url: "https://www.g.cn/generate_204",
@@ -51,6 +53,12 @@ const normalizeName = (name = "") =>
     .replace(/(IEPL|IPLC|BGP|RELAY|PRO|V\d+)/ig, " $1 ")
     .replace(/[【】\[\]（）()|_\-.,/:~]/g, " ")
     .replace(/🇭🇰/g, " HK ")
+    .replace(/🇹🇼/g, " TW ")
+    .replace(/🇸🇬/g, " SG ")
+    .replace(/🇯🇵/g, " JP ")
+    .replace(/🇰🇷/g, " KR ")
+    .replace(/🇻🇳|🇹🇭|🇲🇾|🇮🇩|🇵🇭/g, " AS ")
+    .replace(/🇺🇸/g, " US ")
     .toUpperCase()
     .replace(/\s+/g, " ")
     .trim();
@@ -69,7 +77,39 @@ const buildRegex = (arr = []) =>
     "i"
   );
 
-const HK_REGEX = buildRegex(["香港", "HK", "HKG", "HONGKONG", "HONG KONG"]);
+const buildRegions = () =>
+  ([
+    { name: "HK", pattern: ["香港", "HK", "HKG", "HONGKONG", "HONG KONG"], icon: "Hong_Kong.png" },
+    { name: "TW", pattern: ["台湾", "台北", "新北", "TW", "TWN", "TAIWAN", "TAIPEI", "TPE"], icon: "Taiwan.png" },
+    { name: "SG", pattern: ["新加坡", "狮城", "SG", "SGP", "SINGAPORE", "SIN"], icon: "Singapore.png" },
+    { name: "JP", pattern: ["日本", "东京", "大阪", "JP", "JPN", "JAPAN", "TOKYO", "OSAKA", "NRT", "HND", "TYO"], icon: "Japan.png" },
+    { name: "KR", pattern: ["韩国", "首尔", "KR", "KOR", "KOREA", "SEOUL", "ICN"], icon: "Korea.png" },
+    {
+      name: "AS",
+      pattern: [
+        "越南", "泰国", "马来西亚", "印尼", "菲律宾",
+        "VN", "TH", "MY", "ID", "PH",
+        "VIETNAM", "THAILAND", "MALAYSIA", "INDONESIA", "PHILIPPINES", "MANILA"
+      ],
+      icon: "Available.png"
+    },
+    {
+      name: "US",
+      pattern: [
+        "美国", "纽约", "洛杉矶", "旧金山", "圣何塞", "西雅图", "芝加哥", "达拉斯", "硅谷",
+        "US", "USA",
+        "UNITEDSTATES", "UNITED STATES",
+        "NEWYORK", "NEW YORK",
+        "LOSANGELES", "LOS ANGELES",
+        "SANFRANCISCO", "SAN FRANCISCO",
+        "SANJOSE", "SAN JOSE",
+        "SEATTLE", "CHICAGO", "DALLAS", "LAX", "SJC", "SFO"
+      ],
+      icon: "United_States.png"
+    }
+  ]).map((r) => ({ ...r, regex: buildRegex(r.pattern) }));
+
+const REGIONS = buildRegions();
 
 const buildFakeIpFilter = (bypass = []) =>
   uniq([
@@ -185,15 +225,65 @@ const splitInfoAndNormalProxies = (proxies = [], filterRegex) =>
     { infoProxies: [], normalProxies: [] }
   );
 
-const buildAiProxyList = (allNames = []) => {
-  const nonHk = allNames.filter((n) => !HK_REGEX.test(normalizeName(n)));
+const classifyProxiesByRegion = (normalProxies = [], regions = []) => {
+  const regionGroupsData = regions.map((r) => ({ name: r.name, icon: r.icon, proxies: [] }));
+  const regionGroupMap = new Map(regionGroupsData.map((r) => [r.name, r]));
+  const regionSeen = new Map(regionGroupsData.map((r) => [r.name, new Set()]));
+  const otherProxyNames = [];
+  const otherSeen = new Set();
+
+  normalProxies.forEach((proxy) => {
+    const proxyName = proxy.name;
+    const normName = normalizeName(proxyName);
+    const matchedRegion = regions.find((r) => r.regex.test(normName));
+
+    if (matchedRegion) {
+      const group = regionGroupMap.get(matchedRegion.name);
+      const seen = regionSeen.get(matchedRegion.name);
+      if (group && seen && !seen.has(proxyName)) {
+        group.proxies.push(proxyName);
+        seen.add(proxyName);
+      }
+    } else if (!otherSeen.has(proxyName)) {
+      otherProxyNames.push(proxyName);
+      otherSeen.add(proxyName);
+    }
+  });
+
+  const activeRegions = regionGroupsData
+    .map((r) => ({ ...r, proxies: uniq(r.proxies) }))
+    .filter((r) => r.proxies.length > 0);
+
+  const activeRegionNameSet = new Set(activeRegions.map((r) => r.name));
+  const activeRegionMap = new Map(activeRegions.map((r) => [r.name, r]));
+
+  return {
+    activeRegions,
+    activeRegionNameSet,
+    activeRegionMap,
+    otherProxyNames: uniq(otherProxyNames)
+  };
+};
+
+const buildAiProxyList = (activeRegions = [], otherProxyNames = [], allNames = []) => {
+  const nonHk = uniq([
+    ...activeRegions.filter((r) => r.name !== "HK").flatMap((r) => r.proxies),
+    ...otherProxyNames
+  ]);
   return nonHk.length ? nonHk : allNames;
 };
 
 // ====================
 // 5. 策略组
 // ====================
-const buildProxyGroups = ({ allNames, aiNames, infoNames }) => {
+const buildProxyGroups = ({
+  allNames,
+  aiNames,
+  activeRegionMap,
+  activeRegionNameSet,
+  otherProxyNames,
+  infoNames
+}) => {
   const groups = [];
 
   const add = (name, type, proxies, icon = "Available.png", extra = {}) => {
@@ -209,16 +299,38 @@ const buildProxyGroups = ({ allNames, aiNames, infoNames }) => {
     }
   };
 
+  const regionEntries = SETTINGS.REGION_ORDER.filter((rName) => activeRegionNameSet.has(rName));
+  const allSelectEntries = [
+    ...(allNames.length ? ["BetterFB - 全部", "URL Test - 全部"] : []),
+    ...regionEntries,
+    ...(otherProxyNames.length ? ["Other"] : [])
+  ];
+
   if (allNames.length) {
     add("URL Test - 全部", "url-test", allNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
     add("BetterFB - 全部", "url-test", allNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
-    add("全部", "select", ["BetterFB - 全部", "URL Test - 全部", ...allNames], "Available.png");
+    add("全部", "select", allSelectEntries, "Available.png");
   }
 
   if (aiNames.length) {
     add("URL Test - AI", "url-test", aiNames, "ChatGPT.png", SETTINGS.URL_TEST_EXTRA);
     add("BetterFB - AI", "url-test", aiNames, "ChatGPT.png", SETTINGS.BETTER_FB_EXTRA);
     add("AI", "select", ["BetterFB - AI", "URL Test - AI", ...aiNames], "ChatGPT.png");
+  }
+
+  SETTINGS.REGION_ORDER.forEach((rName) => {
+    const region = activeRegionMap.get(rName);
+    if (!region) return;
+
+    add(`URL Test - ${region.name}`, "url-test", region.proxies, region.icon, SETTINGS.URL_TEST_EXTRA);
+    add(`BetterFB - ${region.name}`, "url-test", region.proxies, region.icon, SETTINGS.BETTER_FB_EXTRA);
+    add(region.name, "select", [`BetterFB - ${region.name}`, `URL Test - ${region.name}`, ...region.proxies], region.icon);
+  });
+
+  if (otherProxyNames.length) {
+    add("URL Test - Other", "url-test", otherProxyNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
+    add("BetterFB - Other", "url-test", otherProxyNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
+    add("Other", "select", ["BetterFB - Other", "URL Test - Other", ...otherProxyNames], "Available.png");
   }
 
   // 被 FILTER_REGEX 命中的节点只进入 Info，不参与 URL Test / BetterFB
@@ -232,6 +344,8 @@ const buildProxyGroups = ({ allNames, aiNames, infoNames }) => {
     [
       ...(allNames.length ? ["全部"] : []),
       ...(aiNames.length ? ["AI"] : []),
+      ...regionEntries,
+      ...(otherProxyNames.length ? ["Other"] : []),
       ...(infoNames.length ? ["Info"] : [])
     ],
     "Global.png"
@@ -309,11 +423,11 @@ const applyDns = (cfg) => {
       "geosite:synology": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
 
       // AI 分流 DNS
-"geosite:openai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-"geosite:anthropic": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-"geosite:google-gemini": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-"geosite:xai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"]
-},
+      "geosite:openai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+      "geosite:anthropic": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+      "geosite:google-gemini": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+      "geosite:xai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"]
+    },
     nameserver: ["https://1.1.1.1/dns-query#全部", "https://8.8.8.8/dns-query#全部"],
     "proxy-server-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
     "direct-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
@@ -360,9 +474,25 @@ function main(config) {
     const baseProxies = normalProxies;
     const allNames = uniq(baseProxies.map((p) => p.name));
     const infoNames = uniq(infoProxies.map((p) => p.name));
-    const aiNames = buildAiProxyList(allNames);
 
-    config["proxy-groups"] = buildProxyGroups({ allNames, aiNames, infoNames });
+    const {
+      activeRegions,
+      activeRegionNameSet,
+      activeRegionMap,
+      otherProxyNames
+    } = classifyProxiesByRegion(baseProxies, REGIONS);
+
+    const aiNames = buildAiProxyList(activeRegions, otherProxyNames, allNames);
+
+    config["proxy-groups"] = buildProxyGroups({
+      allNames,
+      aiNames,
+      activeRegionMap,
+      activeRegionNameSet,
+      otherProxyNames,
+      infoNames
+    });
+
     config.proxies = originalProxies;
   }
 
