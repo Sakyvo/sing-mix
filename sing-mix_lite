@@ -74,6 +74,7 @@ const HK_REGEX = buildRegex(["香港", "HK", "HKG", "HONGKONG", "HONG KONG"]);
 const buildFakeIpFilter = (bypass = []) =>
   uniq([
     "geosite:private",
+    "geosite:cn",
     "geosite:google-cn",
     "geosite:synology",
     ...uniq(
@@ -130,12 +131,10 @@ const STATIC_RULES = [
   "GEOSITE,google-gemini,AI",
   "GEOSITE,xai,AI",
 
-  // 墙外优先代理
+  // 兜底分流
   "GEOSITE,gfw,全部",
-
-  // 通用方案：依靠完整域名解析后的真实 IP 判定 CN
-  // 关键修复：这里不能带 no-resolve
-  "GEOIP,CN,DIRECT",
+  "GEOSITE,cn,DIRECT",
+  "GEOIP,CN,DIRECT,no-resolve",
   "MATCH,全部"
 ];
 
@@ -222,6 +221,7 @@ const buildProxyGroups = ({ allNames, aiNames, infoNames }) => {
     add("AI", "select", ["BetterFB - AI", "URL Test - AI", ...aiNames], "ChatGPT.png");
   }
 
+  // 被 FILTER_REGEX 命中的节点只进入 Info，不参与 URL Test / BetterFB
   if (infoNames.length) {
     add("Info", "select", infoNames, "Available.png");
   }
@@ -299,59 +299,25 @@ const applyDns = (cfg) => {
     "fake-ip-filter-mode": "blacklist",
     "fake-ip-filter": uniq([...fakeIpFilter, ...STATIC_FAKE_IP_FILTER]),
     "respect-rules": true,
-
-    // 仅用于解析 DNS 服务器自身域名
     "default-nameserver": ["223.5.5.5", "119.29.29.29"],
-
-    // 只保留明确需要本地/直连处理的策略
     "nameserver-policy": {
+      // 国内/直连 DNS
       ...nameserverPolicy,
+      "geosite:cn": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
       "geosite:private": "system",
-      "geosite:google-cn": ["https://dns.alidns.com/dns-query#DIRECT", "https://doh.pub/dns-query#DIRECT"],
-      "geosite:synology": ["https://dns.alidns.com/dns-query#DIRECT", "https://doh.pub/dns-query#DIRECT"],
+      "geosite:google-cn": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
+      "geosite:synology": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
 
       // AI 分流 DNS
-      "geosite:openai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-      "geosite:anthropic": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-      "geosite:google-gemini": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-      "geosite:xai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"]
-    },
-
-    // 主解析器：国内 DNS
-    nameserver: [
-      "https://dns.alidns.com/dns-query#DIRECT",
-      "https://doh.pub/dns-query#DIRECT"
-    ],
-
-    // 备用解析器：海外 DNS
-    fallback: [
-      "https://1.1.1.1/dns-query#全部",
-      "https://8.8.8.8/dns-query#全部"
-    ],
-
-    // 国内结果保留；非国内或异常结果使用 fallback
-    "fallback-filter": {
-      geoip: true,
-      "geoip-code": "CN",
-      geosite: ["gfw"],
-      ipcidr: ["240.0.0.0/4"]
-    },
-
-    // 节点域名解析单独走直连 DNS
-    "proxy-server-nameserver": [
-      "https://dns.alidns.com/dns-query#DIRECT",
-      "https://doh.pub/dns-query#DIRECT",
-      "system"
-    ],
-
-    // DIRECT 出口解析
-    "direct-nameserver": [
-      "https://dns.alidns.com/dns-query#DIRECT",
-      "https://doh.pub/dns-query#DIRECT",
-      "system"
-    ],
-
-    "direct-nameserver-follow-policy": false
+"geosite:openai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+"geosite:anthropic": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+"geosite:google-gemini": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+"geosite:xai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"]
+},
+    nameserver: ["https://1.1.1.1/dns-query#全部", "https://8.8.8.8/dns-query#全部"],
+    "proxy-server-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
+    "direct-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
+    "direct-nameserver-follow-policy": true
   };
 };
 
@@ -390,6 +356,7 @@ function main(config) {
       SETTINGS.FILTER_REGEX
     );
 
+    // 被 filter 的节点不再混入 normal 分组，只进入 Info
     const baseProxies = normalProxies;
     const allNames = uniq(baseProxies.map((p) => p.name));
     const infoNames = uniq(infoProxies.map((p) => p.name));
