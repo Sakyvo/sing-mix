@@ -85,7 +85,7 @@ const buildFakeIpFilter = (bypass = []) =>
     "geosite:private",
     "geosite:google-cn",
     "geosite:synology",
-    "geosite:cn",                    // 新增：确保所有直连域名获得真实 IP，避免 Fake IP 缓存滞留
+    "geosite:cn",
     ...uniq(
       bypass.flatMap((domain) => {
         const d = String(domain || "").trim();
@@ -144,7 +144,7 @@ const STATIC_RULES = [
 const STATIC_FAKE_IP_FILTER = buildFakeIpFilter(BYPASS_DOMAINS);
 
 // ====================
-// 4~7. 节点处理、策略组、网络配置、主流程（保持完全不变）
+// 4. 节点处理
 // ====================
 const ensureConfigObject = (input) =>
   input && typeof input === "object" ? input : {};
@@ -188,6 +188,9 @@ const buildAiProxyList = (allNames = []) => {
   return nonHk.length ? nonHk : allNames;
 };
 
+// ====================
+// 5. 策略组
+// ====================
 const buildProxyGroups = ({ allNames, aiNames, infoNames }) => {
   const groups = [];
   const add = (name, type, proxies, icon = "Available.png", extra = {}) => {
@@ -233,6 +236,9 @@ const buildProxyGroups = ({ allNames, aiNames, infoNames }) => {
   return groups;
 };
 
+// ====================
+// 6. 网络配置
+// ====================
 const applyGeoData = (cfg) => {
   cfg["geodata-mode"] = true;
   cfg["geo-auto-update"] = true;
@@ -320,6 +326,9 @@ const applyRuntime = (cfg) => {
   cfg["log-level"] = "warning";
 };
 
+// ====================
+// 7. 主流程
+// ====================
 function main(config) {
   config = ensureConfigObject(config);
   const originalProxies = getOriginalProxies(config);
