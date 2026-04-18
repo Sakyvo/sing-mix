@@ -1,9 +1,17 @@
+ ====================
+// 0. 特殊域名处理(手动添加)
 // ====================
-// 0. 直连域名(手动添加)
-// ====================
+
+// 强制直连
 const BYPASS_DOMAINS = [
-  "example.com", "none.com"
+  "example.com", "example.org"
 ];
+
+// 强制代理
+const FORCE_PROXY_DOMAINS = [
+  "test.com", "test.org"
+];
+
 // 更建议使用代理软件自带的过滤
 // 脚本更新会导致该部分配置丢失
 
@@ -26,15 +34,14 @@ const SETTINGS = {
     timeout: 1000
   },
 
-  // BetterFB 本质仍是 url-test，只是把 tolerance 提高到 1000。
-  // 这样会继续自动选择低延迟节点，但只有在延迟差距足够大时才切换，稳定性更接近 fallback。
   BETTER_FB_EXTRA: {
     hidden: true,
     url: "https://www.g.cn/generate_204",
     interval: 900,
-    tolerance: 1000,
+    tolerance: 750,
     lazy: true,
-    timeout: 1000
+    timeout: 1000,
+    "max-failed-times": 1   
   },
 
   FILTER_REGEX: /群|邀请|返利|官网|官方|网址|订阅|购买|续费|剩余|到期|过期|流量|备用|邮箱|客服|联系|工单|倒卖|防止|梯子|tg|telegram|电报|发布|重置/i
@@ -114,9 +121,9 @@ const REGIONS = buildRegions();
 const buildFakeIpFilter = (bypass = []) =>
   uniq([
     "geosite:private",
-    "geosite:cn",
     "geosite:google-cn",
     "geosite:synology",
+    "geosite:cn",
     ...uniq(
       bypass.flatMap((domain) => {
         const d = String(domain || "").trim();
@@ -154,24 +161,18 @@ const pickDirectRules = (rules = []) =>
 // 3. 固定规则
 // ====================
 const STATIC_RULES = [
-  // 广告过滤
   "GEOSITE,category-ads-all,REJECT",
-
-  // 直连分流
+  ...uniq(FORCE_PROXY_DOMAINS).map((d) => `DOMAIN,${d},全部`),
   "GEOSITE,private,DIRECT",
   "GEOIP,private,DIRECT,no-resolve",
   "GEOSITE,google-cn,DIRECT",
   "GEOSITE,synology,DIRECT",
   "DOMAIN-SUFFIX,sharepoint.com,DIRECT",
   ...uniq(BYPASS_DOMAINS).map((d) => `DOMAIN-SUFFIX,${d},DIRECT`),
-
-  // AI 分流
   "GEOSITE,openai,AI",
   "GEOSITE,anthropic,AI",
   "GEOSITE,google-gemini,AI",
   "GEOSITE,xai,AI",
-
-  // 兜底分流
   "GEOSITE,gfw,全部",
   "GEOSITE,cn,DIRECT",
   "GEOIP,CN,DIRECT,no-resolve",
@@ -333,7 +334,6 @@ const buildProxyGroups = ({
     add("Other", "select", ["BetterFB - Other", "URL Test - Other", ...otherProxyNames], "Available.png");
   }
 
-  // 被 FILTER_REGEX 命中的节点只进入 Info，不参与 URL Test / BetterFB
   if (infoNames.length) {
     add("Info", "select", infoNames, "Available.png");
   }
@@ -398,10 +398,7 @@ const applyTun = (cfg) => {
 const applyDns = (cfg) => {
   const dns = cfg.dns || {};
   const fakeIpFilter = Array.isArray(dns["fake-ip-filter"]) ? dns["fake-ip-filter"] : [];
-  const nameserverPolicy =
-    dns["nameserver-policy"] && typeof dns["nameserver-policy"] === "object"
-      ? dns["nameserver-policy"]
-      : {};
+  const nameserverPolicy = dns["nameserver-policy"] && typeof dns["nameserver-policy"] === "object" ? dns["nameserver-policy"] : {};
 
   cfg.dns = {
     ...dns,
@@ -415,14 +412,13 @@ const applyDns = (cfg) => {
     "respect-rules": true,
     "default-nameserver": ["223.5.5.5", "119.29.29.29"],
     "nameserver-policy": {
-      // 国内/直连 DNS
       ...nameserverPolicy,
+      "pdir.cc.cd": ["https://1.1.1.1/dns-query#全部", "https://8.8.8.8/dns-query#全部"],
+      "vale.cc.cd": ["https://1.1.1.1/dns-query#全部", "https://8.8.8.8/dns-query#全部"],
       "geosite:cn": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
       "geosite:private": "system",
       "geosite:google-cn": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
       "geosite:synology": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
-
-      // AI 分流 DNS
       "geosite:openai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
       "geosite:anthropic": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
       "geosite:google-gemini": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
@@ -458,8 +454,6 @@ function main(config) {
   const existingRules = Array.isArray(config.rules) ? config.rules : [];
 
   delete config["rule-providers"];
-
-  // 仅合并原配置中的 DIRECT 规则，避免把旧分组规则一并带入导致 proxy not found
   config.rules = mergeRules(STATIC_RULES, pickDirectRules(existingRules));
 
   if (originalProxies.length) {
@@ -470,7 +464,6 @@ function main(config) {
       SETTINGS.FILTER_REGEX
     );
 
-    // 被 filter 的节点不再混入 normal 分组，只进入 Info
     const baseProxies = normalProxies;
     const allNames = uniq(baseProxies.map((p) => p.name));
     const infoNames = uniq(infoProxies.map((p) => p.name));
