@@ -12,9 +12,6 @@ const FORCE_PROXY_DOMAINS = [
   "test.com", "test.org"
 ];
 
-// 更建议使用代理软件自带的过滤
-// 脚本更新会导致该部分配置丢失
-
 // ====================
 // 1. 常量配置
 // ====================
@@ -162,21 +159,19 @@ const pickDirectRules = (rules = []) =>
 // ====================
 const STATIC_RULES = [
   "GEOSITE,category-ads-all,REJECT",
-  ...uniq(FORCE_PROXY_DOMAINS).map((d) => `DOMAIN,${d},全部`),
+  ...uniq(FORCE_PROXY_DOMAINS).map((d) => `DOMAIN,${d},main`),
   "GEOSITE,private,DIRECT",
   "GEOIP,private,DIRECT,no-resolve",
   "GEOSITE,google-cn,DIRECT",
   "GEOSITE,synology,DIRECT",
   "DOMAIN-SUFFIX,sharepoint.com,DIRECT",
   ...uniq(BYPASS_DOMAINS).map((d) => `DOMAIN-SUFFIX,${d},DIRECT`),
-  "GEOSITE,openai,AI",
-  "GEOSITE,anthropic,AI",
-  "GEOSITE,google-gemini,AI",
-  "GEOSITE,xai,AI",
-  "GEOSITE,gfw,全部",
+  "GEOSITE,category-ai-!cn,AI",
+  "GEOSITE,telegram,TG",
+  "GEOSITE,gfw,main",
   "GEOSITE,cn,DIRECT",
   "GEOIP,CN,DIRECT,no-resolve",
-  "MATCH,全部"
+  "MATCH,main"
 ];
 
 const STATIC_FAKE_IP_FILTER = buildFakeIpFilter(BYPASS_DOMAINS);
@@ -302,21 +297,28 @@ const buildProxyGroups = ({
 
   const regionEntries = SETTINGS.REGION_ORDER.filter((rName) => activeRegionNameSet.has(rName));
   const allSelectEntries = [
-    ...(allNames.length ? ["BetterFB - 全部", "URL Test - 全部"] : []),
+    ...(allNames.length ? ["BetterFB - main", "URL Test - main"] : []),
     ...regionEntries,
-    ...(otherProxyNames.length ? ["Other"] : [])
+    ...(otherProxyNames.length ? ["other"] : [])
   ];
 
   if (allNames.length) {
-    add("URL Test - 全部", "url-test", allNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
-    add("BetterFB - 全部", "url-test", allNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
-    add("全部", "select", allSelectEntries, "Available.png");
+    add("URL Test - main", "url-test", allNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
+    add("BetterFB - main", "url-test", allNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
+    add("main", "select", allSelectEntries, "Available.png");
   }
 
   if (aiNames.length) {
     add("URL Test - AI", "url-test", aiNames, "ChatGPT.png", SETTINGS.URL_TEST_EXTRA);
     add("BetterFB - AI", "url-test", aiNames, "ChatGPT.png", SETTINGS.BETTER_FB_EXTRA);
     add("AI", "select", ["BetterFB - AI", "URL Test - AI", ...aiNames], "ChatGPT.png");
+  }
+
+  // 新增 TG 分组（位于 AI 之后）
+  if (allNames.length) {
+    const hasSG = activeRegionNameSet.has("SG");
+    const tgProxies = hasSG ? ["SG", "main"] : ["main"];
+    add("TG", "select", tgProxies, "Telegram.png");
   }
 
   SETTINGS.REGION_ORDER.forEach((rName) => {
@@ -329,9 +331,9 @@ const buildProxyGroups = ({
   });
 
   if (otherProxyNames.length) {
-    add("URL Test - Other", "url-test", otherProxyNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
-    add("BetterFB - Other", "url-test", otherProxyNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
-    add("Other", "select", ["BetterFB - Other", "URL Test - Other", ...otherProxyNames], "Available.png");
+    add("URL Test - other", "url-test", otherProxyNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
+    add("BetterFB - other", "url-test", otherProxyNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
+    add("other", "select", ["BetterFB - other", "URL Test - other", ...otherProxyNames], "Available.png");
   }
 
   if (infoNames.length) {
@@ -342,10 +344,11 @@ const buildProxyGroups = ({
     "GLOBAL",
     "select",
     [
-      ...(allNames.length ? ["全部"] : []),
+      ...(allNames.length ? ["main"] : []),
       ...(aiNames.length ? ["AI"] : []),
+      ...(allNames.length ? ["TG"] : []),
       ...regionEntries,
-      ...(otherProxyNames.length ? ["Other"] : []),
+      ...(otherProxyNames.length ? ["other"] : []),
       ...(infoNames.length ? ["Info"] : [])
     ],
     "Global.png"
@@ -413,18 +416,16 @@ const applyDns = (cfg) => {
     "default-nameserver": ["223.5.5.5", "119.29.29.29"],
     "nameserver-policy": {
       ...nameserverPolicy,
-      "pdir.cc.cd": ["https://1.1.1.1/dns-query#全部", "https://8.8.8.8/dns-query#全部"],
-      "vale.cc.cd": ["https://1.1.1.1/dns-query#全部", "https://8.8.8.8/dns-query#全部"],
+      "pdir.cc.cd": ["https://1.1.1.1/dns-query#main", "https://8.8.8.8/dns-query#main"],
+      "vale.cc.cd": ["https://1.1.1.1/dns-query#main", "https://8.8.8.8/dns-query#main"],
       "geosite:cn": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
       "geosite:private": "system",
       "geosite:google-cn": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
       "geosite:synology": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
-      "geosite:openai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-      "geosite:anthropic": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-      "geosite:google-gemini": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-      "geosite:xai": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"]
+      "geosite:category-ai-!cn": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
+      "geosite:telegram": ["https://1.1.1.1/dns-query#TG", "https://8.8.8.8/dns-query#TG"]
     },
-    nameserver: ["https://1.1.1.1/dns-query#全部", "https://8.8.8.8/dns-query#全部"],
+    nameserver: ["https://1.1.1.1/dns-query#main", "https://8.8.8.8/dns-query#main"],
     "proxy-server-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
     "direct-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
     "direct-nameserver-follow-policy": true
