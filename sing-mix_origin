@@ -135,7 +135,7 @@ const mergeRules = (baseRules = [], extraRules = []) => {
   if (!extra.length) return baseRules.slice();
 
   const matchIndex = baseRules.findIndex(
-    (rule) => String(rule).trim().toUpperCase() === "MATCH,全部"
+    (rule) => String(rule).trim().toUpperCase() === "MATCH,main"
   );
 
   if (matchIndex === -1) return uniq([...baseRules, ...extra]);
@@ -314,7 +314,6 @@ const buildProxyGroups = ({
     add("AI", "select", ["BetterFB - AI", "URL Test - AI", ...aiNames], "ChatGPT.png");
   }
 
-  // 新增 TG 分组（位于 AI 之后）
   if (allNames.length) {
     const hasSG = activeRegionNameSet.has("SG");
     const tgProxies = hasSG ? ["SG", "main"] : ["main"];
@@ -400,35 +399,95 @@ const applyTun = (cfg) => {
 
 const applyDns = (cfg) => {
   const dns = cfg.dns || {};
-  const fakeIpFilter = Array.isArray(dns["fake-ip-filter"]) ? dns["fake-ip-filter"] : [];
-  const nameserverPolicy = dns["nameserver-policy"] && typeof dns["nameserver-policy"] === "object" ? dns["nameserver-policy"] : {};
+  const fakeIpFilterFromCfg = Array.isArray(dns["fake-ip-filter"]) ? dns["fake-ip-filter"] : [];
+  const nameserverPolicyFromCfg = dns["nameserver-policy"] && typeof dns["nameserver-policy"] === "object" ? dns["nameserver-policy"] : {};
+
+  const chinaDNS = [
+    "system",
+    "https://dns.alidns.com/dns-query",
+    "https://doh.pub/dns-query"
+  ];
+
+  const foreignDNS = ["https://1.1.1.1/dns-query#main"];
+
+  const directGeoForChinaDNS = [
+    "geosite:cn",
+    "geosite:google-cn",
+    "geosite:synology",
+    "geosite:googlefcm",
+    "geosite:epicgames",
+    "geosite:nvidia@cn",
+    "geosite:microsoft@cn",
+    "geosite:cloudflare@cn",
+    "geosite:steam@cn",
+    "geosite:category-ntp",
+    "geosite:connectivity-check",
+    "geosite:apple",
+    "geosite:spotify",
+    "geosite:microsoft"
+  ];
+
+  const directPolicy = {};
+  directGeoForChinaDNS.forEach(geo => {
+    directPolicy[geo] = chinaDNS;
+  });
+  directPolicy["geosite:private"] = "system";
+
+  const forceProxyPolicy = {};
+  uniq(FORCE_PROXY_DOMAINS).forEach(d => {
+    const domain = String(d || "").trim();
+    if (domain) forceProxyPolicy[domain] = foreignDNS;
+  });
+
+  const fullFakeIpFilter = uniq([
+    "+.cn",
+    "geosite:private",
+    ...directGeoForChinaDNS,
+    ...STATIC_FAKE_IP_FILTER,
+    ...fakeIpFilterFromCfg
+  ]);
 
   cfg.dns = {
     ...dns,
     enable: true,
+    listen: "0.0.0.0:1053",
+    ipv6: false,
     "cache-algorithm": "arc",
-    listen: dns.listen,
-    ipv6: dns.ipv6,
+    "prefer-h3": false,
+    "use-hosts": true,
+    "use-system-hosts": true,
+    "respect-rules": false,
     "enhanced-mode": "fake-ip",
     "fake-ip-filter-mode": "blacklist",
-    "fake-ip-filter": uniq([...fakeIpFilter, ...STATIC_FAKE_IP_FILTER]),
-    "respect-rules": true,
+    "fake-ip-filter": fullFakeIpFilter,
     "default-nameserver": ["223.5.5.5", "119.29.29.29"],
     "nameserver-policy": {
-      ...nameserverPolicy,
-      "pdir.cc.cd": ["https://1.1.1.1/dns-query#main", "https://8.8.8.8/dns-query#main"],
-      "vale.cc.cd": ["https://1.1.1.1/dns-query#main", "https://8.8.8.8/dns-query#main"],
-      "geosite:cn": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
-      "geosite:private": "system",
-      "geosite:google-cn": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
-      "geosite:synology": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT"],
-      "geosite:category-ai-!cn": ["https://1.1.1.1/dns-query#AI", "https://8.8.8.8/dns-query#AI"],
-      "geosite:telegram": ["https://1.1.1.1/dns-query#TG", "https://8.8.8.8/dns-query#TG"]
+      ...nameserverPolicyFromCfg,
+      ...directPolicy,
+      "*": "system",
+      "+.arpa": "system",
+      ...forceProxyPolicy
     },
-    nameserver: ["https://1.1.1.1/dns-query#main", "https://8.8.8.8/dns-query#main"],
-    "proxy-server-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
-    "direct-nameserver": ["223.5.5.5#DIRECT", "119.29.29.29#DIRECT", "system"],
+    nameserver: foreignDNS,
+    "proxy-server-nameserver": [
+      "https://doh.pub/dns-query#DIRECT",
+      "https://dns.alidns.com/dns-query#DIRECT"
+    ],
+    "direct-nameserver": ["system", "223.5.5.5", "119.29.29.29"],
     "direct-nameserver-follow-policy": true
+  };
+
+  cfg.hosts = {
+    "dns.alidns.com": ["223.5.5.5", "223.6.6.6"],
+    "doh.pub": ["1.12.12.12", "120.53.53.53"],
+    
+    // 解决谷歌商店无法下载的问题
+"services.googleapis.cn": ["services.googleapis.com"],
+
+    // 屏蔽哔哩哔哩PCDN，解决访问视频卡顿问题
+   "+.mcdn.bilivideo.com": ["0.0.0.0"],
+    "+.mcdn.bilivideo.cn": ["0.0.0.0"]
+    
   };
 };
 
