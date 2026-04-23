@@ -20,7 +20,7 @@ const SETTINGS = {
   GEOIP_URL: "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat",
   GEOSITE_URL: "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat",
 
-  REGION_ORDER: ["HK", "TW", "SG", "JP", "KR", "AS", "US"],
+  REGION_ORDER:["HK", "TW", "SG", "JP", "KR", "AS", "US"],
 
   URL_TEST_EXTRA: {
     hidden: true,
@@ -67,7 +67,7 @@ const normalizeName = (name = "") =>
     .replace(/\s+/g, " ")
     .trim();
 
-const buildRegex = (arr = []) =>
+const buildRegex = (arr =[]) =>
   new RegExp(
     arr
       .map((raw) => {
@@ -83,14 +83,14 @@ const buildRegex = (arr = []) =>
 
 const buildRegions = () =>
   ([
-    { name: "HK", pattern: ["香港", "HK", "HKG", "HONGKONG", "HONG KONG"], icon: "Hong_Kong.png" },
-    { name: "TW", pattern: ["台湾", "台北", "新北", "TW", "TWN", "TAIWAN", "TAIPEI", "TPE"], icon: "Taiwan.png" },
-    { name: "SG", pattern: ["新加坡", "狮城", "SG", "SGP", "SINGAPORE", "SIN"], icon: "Singapore.png" },
-    { name: "JP", pattern: ["日本", "东京", "大阪", "JP", "JPN", "JAPAN", "TOKYO", "OSAKA", "NRT", "HND", "TYO"], icon: "Japan.png" },
-    { name: "KR", pattern: ["韩国", "首尔", "KR", "KOR", "KOREA", "SEOUL", "ICN"], icon: "Korea.png" },
+    { name: "HK", pattern:["香港", "HK", "HKG", "HONGKONG", "HONG KONG"], icon: "Hong_Kong.png" },
+    { name: "TW", pattern:["台湾", "台北", "新北", "TW", "TWN", "TAIWAN", "TAIPEI", "TPE"], icon: "Taiwan.png" },
+    { name: "SG", pattern:["新加坡", "狮城", "SG", "SGP", "SINGAPORE", "SIN"], icon: "Singapore.png" },
+    { name: "JP", pattern:["日本", "东京", "大阪", "JP", "JPN", "JAPAN", "TOKYO", "OSAKA", "NRT", "HND", "TYO"], icon: "Japan.png" },
+    { name: "KR", pattern:["韩国", "首尔", "KR", "KOR", "KOREA", "SEOUL", "ICN"], icon: "Korea.png" },
     {
       name: "AS",
-      pattern: [
+      pattern:[
         "越南", "泰国", "马来西亚", "印尼", "菲律宾",
         "VN", "TH", "MY", "ID", "PH",
         "VIETNAM", "THAILAND", "MALAYSIA", "INDONESIA", "PHILIPPINES", "MANILA"
@@ -99,7 +99,7 @@ const buildRegions = () =>
     },
     {
       name: "US",
-      pattern: [
+      pattern:[
         "美国", "纽约", "洛杉矶", "旧金山", "圣何塞", "西雅图", "芝加哥", "达拉斯", "硅谷",
         "US", "USA",
         "UNITEDSTATES", "UNITED STATES",
@@ -125,13 +125,13 @@ const buildFakeIpFilter = (bypass = []) =>
       bypass.flatMap((domain) => {
         const d = String(domain || "").trim();
         if (!d) return [];
-        return d.includes("*") || d.startsWith("+.") ? [d] : [`+.${d}`];
+        return d.includes("*") || d.startsWith("+.") ?[d] : [`+.${d}`];
       })
     )
   ]);
 
-const mergeRules = (baseRules = [], extraRules = []) => {
-  const extra = Array.isArray(extraRules) ? extraRules.filter(Boolean) : [];
+const mergeRules = (baseRules = [], extraRules =[]) => {
+  const extra = Array.isArray(extraRules) ? extraRules.filter(Boolean) :[];
   if (!extra.length) return baseRules.slice();
 
   const matchIndex = baseRules.findIndex(
@@ -147,7 +147,7 @@ const mergeRules = (baseRules = [], extraRules = []) => {
   ]);
 };
 
-const pickDirectRules = (rules = []) =>
+const pickDirectRules = (rules =[]) =>
   rules.filter((rule) => {
     const r = String(rule || "").trim();
     if (!r || r.startsWith("#")) return false;
@@ -157,7 +157,7 @@ const pickDirectRules = (rules = []) =>
 // ====================
 // 3. 固定规则
 // ====================
-const STATIC_RULES = [
+const STATIC_RULES =[
   "GEOSITE,category-ads-all,REJECT",
   ...uniq(FORCE_PROXY_DOMAINS).map((d) => `DOMAIN,${d},main`),
   "GEOSITE,private,DIRECT",
@@ -166,8 +166,8 @@ const STATIC_RULES = [
   "GEOSITE,synology,DIRECT",
   "DOMAIN-SUFFIX,sharepoint.com,DIRECT",
   ...uniq(BYPASS_DOMAINS).map((d) => `DOMAIN-SUFFIX,${d},DIRECT`),
-  "GEOSITE,category-ai-!cn,AI",
-  "GEOSITE,telegram,TG",
+  "GEOSITE,category-ai-!cn,ai",
+  "GEOSITE,telegram,tg",
   "GEOSITE,gfw,main",
   "GEOSITE,cn,DIRECT",
   "GEOIP,CN,DIRECT,no-resolve",
@@ -183,9 +183,9 @@ const ensureConfigObject = (input) =>
   input && typeof input === "object" ? input : {};
 
 const getOriginalProxies = (input) =>
-  Array.isArray(input.proxies) ? input.proxies : [];
+  Array.isArray(input.proxies) ? input.proxies :[];
 
-const makeProxyNamesUnique = (proxies = []) => {
+const makeProxyNamesUnique = (proxies =[]) => {
   const used = new Set();
   const nextIdx = new Map();
 
@@ -211,21 +211,21 @@ const makeProxyNamesUnique = (proxies = []) => {
   });
 };
 
-const splitInfoAndNormalProxies = (proxies = [], filterRegex) =>
+const splitInfoAndNormalProxies = (proxies =[], filterRegex) =>
   proxies.reduce(
     (acc, proxy) => {
       if (!proxy || !proxy.name) return acc;
       (filterRegex.test(proxy.name) ? acc.infoProxies : acc.normalProxies).push(proxy);
       return acc;
     },
-    { infoProxies: [], normalProxies: [] }
+    { infoProxies: [], normalProxies:[] }
   );
 
-const classifyProxiesByRegion = (normalProxies = [], regions = []) => {
-  const regionGroupsData = regions.map((r) => ({ name: r.name, icon: r.icon, proxies: [] }));
+const classifyProxiesByRegion = (normalProxies = [], regions =[]) => {
+  const regionGroupsData = regions.map((r) => ({ name: r.name, icon: r.icon, proxies:[] }));
   const regionGroupMap = new Map(regionGroupsData.map((r) => [r.name, r]));
-  const regionSeen = new Map(regionGroupsData.map((r) => [r.name, new Set()]));
-  const otherProxyNames = [];
+  const regionSeen = new Map(regionGroupsData.map((r) =>[r.name, new Set()]));
+  const otherProxyNames =[];
   const otherSeen = new Set();
 
   normalProxies.forEach((proxy) => {
@@ -261,7 +261,7 @@ const classifyProxiesByRegion = (normalProxies = [], regions = []) => {
   };
 };
 
-const buildAiProxyList = (activeRegions = [], otherProxyNames = [], allNames = []) => {
+const buildAiProxyList = (activeRegions = [], otherProxyNames = [], allNames =[]) => {
   const nonHk = uniq([
     ...activeRegions.filter((r) => r.name !== "HK").flatMap((r) => r.proxies),
     ...otherProxyNames
@@ -280,7 +280,7 @@ const buildProxyGroups = ({
   otherProxyNames,
   infoNames
 }) => {
-  const groups = [];
+  const groups =[];
 
   const add = (name, type, proxies, icon = "Available.png", extra = {}) => {
     proxies = uniq(proxies);
@@ -296,28 +296,28 @@ const buildProxyGroups = ({
   };
 
   const regionEntries = SETTINGS.REGION_ORDER.filter((rName) => activeRegionNameSet.has(rName));
-  const allSelectEntries = [
-    ...(allNames.length ? ["BetterFB - main", "URL Test - main"] : []),
-    ...regionEntries,
-    ...(otherProxyNames.length ? ["other"] : [])
-  ];
 
   if (allNames.length) {
-    add("URL Test - main", "url-test", allNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
-    add("BetterFB - main", "url-test", allNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
-    add("main", "select", allSelectEntries, "Available.png");
+    // main 分组引用 All 和 Other
+    const mainEntries = ["All", ...regionEntries];
+    if (otherProxyNames.length) mainEntries.push("Other");
+    add("main", "select", mainEntries, "Available.png");
+
+    add("URL Test - All", "url-test", allNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
+    add("BetterFB - All", "url-test", allNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
+    add("All", "select", ["BetterFB - All", "URL Test - All", ...allNames], "Available.png");
   }
 
   if (aiNames.length) {
-    add("URL Test - AI", "url-test", aiNames, "ChatGPT.png", SETTINGS.URL_TEST_EXTRA);
-    add("BetterFB - AI", "url-test", aiNames, "ChatGPT.png", SETTINGS.BETTER_FB_EXTRA);
-    add("AI", "select", ["BetterFB - AI", "URL Test - AI", ...aiNames], "ChatGPT.png");
+    add("URL Test - ai", "url-test", aiNames, "ChatGPT.png", SETTINGS.URL_TEST_EXTRA);
+    add("BetterFB - ai", "url-test", aiNames, "ChatGPT.png", SETTINGS.BETTER_FB_EXTRA);
+    add("ai", "select", ["BetterFB - ai", "URL Test - ai", ...aiNames], "ChatGPT.png");
   }
 
   if (allNames.length) {
     const hasSG = activeRegionNameSet.has("SG");
     const tgProxies = hasSG ? ["SG", "main"] : ["main"];
-    add("TG", "select", tgProxies, "Telegram.png");
+    add("tg", "select", tgProxies, "Telegram.png");
   }
 
   SETTINGS.REGION_ORDER.forEach((rName) => {
@@ -330,25 +330,24 @@ const buildProxyGroups = ({
   });
 
   if (otherProxyNames.length) {
-    add("URL Test - other", "url-test", otherProxyNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
-    add("BetterFB - other", "url-test", otherProxyNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
-    add("other", "select", ["BetterFB - other", "URL Test - other", ...otherProxyNames], "Available.png");
+    add("URL Test - Other", "url-test", otherProxyNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
+    add("BetterFB - Other", "url-test", otherProxyNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
+    add("Other", "select", ["BetterFB - Other", "URL Test - Other", ...otherProxyNames], "Available.png");
   }
 
   if (infoNames.length) {
-    add("Info", "select", infoNames, "Available.png");
+    add("info", "select", infoNames, "Available.png");
   }
 
   add(
     "GLOBAL",
-    "select",
-    [
-      ...(allNames.length ? ["main"] : []),
-      ...(aiNames.length ? ["AI"] : []),
-      ...(allNames.length ? ["TG"] : []),
+    "select",[
+      ...(allNames.length ? ["main", "All"] : []),
+      ...(aiNames.length ? ["ai"] :[]),
+      ...(allNames.length ? ["tg"] :[]),
       ...regionEntries,
-      ...(otherProxyNames.length ? ["other"] : []),
-      ...(infoNames.length ? ["Info"] : [])
+      ...(otherProxyNames.length ? ["Other"] : []),
+      ...(infoNames.length ? ["info"] :[])
     ],
     "Global.png"
   );
@@ -378,9 +377,9 @@ const applySniffer = (cfg) => {
     "parse-pure-ip": true,
     "override-destination": true,
     sniff: {
-      HTTP: { ports: [80, "8080-8880"], "override-destination": true },
+      HTTP: { ports:[80, "8080-8880"], "override-destination": true },
       TLS: { ports: [443, 8443] },
-      QUIC: { ports: [443, 8443] }
+      QUIC: { ports:[443, 8443] }
     }
   };
 };
@@ -393,24 +392,24 @@ const applyTun = (cfg) => {
     "auto-route": true,
     "auto-detect-interface": true,
     "strict-route": true,
-    "dns-hijack": ["any:53", "tcp://any:53"]
+    "dns-hijack":["any:53", "tcp://any:53"]
   };
 };
 
 const applyDns = (cfg) => {
   const dns = cfg.dns || {};
-  const fakeIpFilterFromCfg = Array.isArray(dns["fake-ip-filter"]) ? dns["fake-ip-filter"] : [];
+  const fakeIpFilterFromCfg = Array.isArray(dns["fake-ip-filter"]) ? dns["fake-ip-filter"] :[];
   const nameserverPolicyFromCfg = dns["nameserver-policy"] && typeof dns["nameserver-policy"] === "object" ? dns["nameserver-policy"] : {};
 
-  const chinaDNS = [
+  const chinaDNS =[
     "system",
     "https://dns.alidns.com/dns-query",
     "https://doh.pub/dns-query"
   ];
 
-  const foreignDNS = ["https://1.1.1.1/dns-query#main"];
+  const foreignDNS =["https://1.1.1.1/dns-query#main"];
 
-  const directGeoForChinaDNS = [
+  const directGeoForChinaDNS =[
     "geosite:cn",
     "geosite:google-cn",
     "geosite:synology",
@@ -460,7 +459,7 @@ const applyDns = (cfg) => {
     "enhanced-mode": "fake-ip",
     "fake-ip-filter-mode": "blacklist",
     "fake-ip-filter": fullFakeIpFilter,
-    "default-nameserver": ["223.5.5.5", "119.29.29.29"],
+    "default-nameserver":["223.5.5.5", "119.29.29.29"],
     "nameserver-policy": {
       ...nameserverPolicyFromCfg,
       ...directPolicy,
@@ -469,25 +468,24 @@ const applyDns = (cfg) => {
       ...forceProxyPolicy
     },
     nameserver: foreignDNS,
-    "proxy-server-nameserver": [
+    "proxy-server-nameserver":[
       "https://doh.pub/dns-query#DIRECT",
       "https://dns.alidns.com/dns-query#DIRECT"
     ],
-    "direct-nameserver": ["system", "223.5.5.5", "119.29.29.29"],
+    "direct-nameserver":["system", "223.5.5.5", "119.29.29.29"],
     "direct-nameserver-follow-policy": true
   };
 
   cfg.hosts = {
-    "dns.alidns.com": ["223.5.5.5", "223.6.6.6"],
-    "doh.pub": ["1.12.12.12", "120.53.53.53"],
+    "dns.alidns.com":["223.5.5.5", "223.6.6.6"],
+    "doh.pub":["1.12.12.12", "120.53.53.53"],
     
     // 解决谷歌商店无法下载的问题
-"services.googleapis.cn": ["services.googleapis.com"],
+    "services.googleapis.cn": ["services.googleapis.com"],
 
     // 屏蔽哔哩哔哩PCDN，解决访问视频卡顿问题
-   "+.mcdn.bilivideo.com": ["0.0.0.0"],
-    "+.mcdn.bilivideo.cn": ["0.0.0.0"]
-    
+    "+.mcdn.bilivideo.com": ["0.0.0.0"],
+    "+.mcdn.bilivideo.cn":["0.0.0.0"]
   };
 };
 
