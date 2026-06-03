@@ -17,8 +17,7 @@ const FORCE_PROXY_DOMAINS = [
 // ====================
 const SETTINGS = {
   ICON_BASE: "https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/",
-  GEOIP_URL: "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geoip.dat",
-  GEOSITE_URL: "https://github.com/MetaCubeX/meta-rules-dat/releases/download/latest/geosite.dat",
+  RULE_PROVIDER_URL_BASE: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo",
 
   REGION_ORDER:["HK", "TW", "SG", "JP", "KR", "AS", "US"],
 
@@ -26,19 +25,10 @@ const SETTINGS = {
     hidden: true,
     url: "https://www.g.cn/generate_204",
     interval: 900,
-    tolerance: 50,
+    tolerance: 75,
     lazy: true,
-    timeout: 1000
-  },
-
-  BETTER_FB_EXTRA: {
-    hidden: true,
-    url: "https://www.g.cn/generate_204",
-    interval: 900,
-    tolerance: 500,
-    lazy: true,
-    timeout: 1000,
-    "max-failed-times": 1   
+    timeout: 750,
+    "max-failed-times": 1
   },
 
   FILTER_REGEX: /群|邀请|返利|官网|官方|网址|订阅|购买|续费|剩余|到期|过期|流量|备用|邮箱|客服|联系|工单|倒卖|防止|梯子|tg|telegram|电报|发布|重置/i
@@ -107,17 +97,16 @@ const buildRegions = () =>
       ],
       icon: "United_States.png"
     }
-
   ]).map((r) => ({ ...r, regex: buildRegex(r.pattern) }));
 
 const REGIONS = buildRegions();
 
 const buildFakeIpFilter = (bypass = []) =>
   uniq([
-    "geosite:private",
-    "geosite:google-cn",
-    "geosite:synology",
-    "geosite:cn",
+    "rule-set:private",
+    "rule-set:google-cn",
+    "rule-set:synology",
+    "rule-set:cn",
     ...uniq(
       bypass.flatMap((domain) => {
         const d = String(domain || "").trim();
@@ -152,24 +141,63 @@ const pickDirectRules = (rules =[]) =>
   });
 
 // ====================
-// 3. 固定规则
+// 3. 规则集与固定规则
 // ====================
+const RULE_PROVIDERS_DOMAINS = [
+  "category-ads-all", "private", "google-cn", "synology", "microsoft@cn",
+  "category-game-platforms-download@cn", "category-ai-!cn", "telegram", "gfw", "cn",
+  "googlefcm", "epicgames", "nvidia@cn", "cloudflare@cn", "steam@cn",
+  "category-ntp", "connectivity-check", "apple", "spotify", "microsoft"
+];
+
+const RULE_PROVIDERS_IPS = [
+  "private", "cn"
+];
+
+const buildRuleProviders = () => {
+  const providers = {};
+
+  RULE_PROVIDERS_DOMAINS.forEach(name => {
+    providers[name] = {
+      type: "http",
+      behavior: "domain",
+      format: "mrs",
+      path: `./rules/${name}.mrs`,
+      url: `${SETTINGS.RULE_PROVIDER_URL_BASE}/geosite/${name}.mrs`,
+      interval: 86400
+    };
+  });
+
+  RULE_PROVIDERS_IPS.forEach(name => {
+    providers[`${name}-ip`] = {
+      type: "http",
+      behavior: "ipcidr",
+      format: "mrs",
+      path: `./rules/${name}-ip.mrs`,
+      url: `${SETTINGS.RULE_PROVIDER_URL_BASE}/geoip/${name}.mrs`,
+      interval: 86400
+    };
+  });
+
+  return providers;
+};
+
 const STATIC_RULES =[
-  "GEOSITE,category-ads-all,REJECT",
+  "RULE-SET,category-ads-all,REJECT",
   ...uniq(BYPASS_DOMAINS).map((d) => `DOMAIN-SUFFIX,${d},DIRECT`),
   ...uniq(FORCE_PROXY_DOMAINS).map((d) => `DOMAIN,${d},main`),
-  "GEOSITE,private,DIRECT",
-  "GEOIP,private,DIRECT,no-resolve",
-  "GEOSITE,google-cn,DIRECT",
-  "GEOSITE,synology,DIRECT",
+  "RULE-SET,private,DIRECT",
+  "RULE-SET,private-ip,DIRECT,no-resolve",
+  "RULE-SET,google-cn,DIRECT",
+  "RULE-SET,synology,DIRECT",
   "DOMAIN-SUFFIX,sharepoint.com,DIRECT",
-  "GEOSITE,microsoft@cn,DIRECT",
-  "GEOSITE,category-game-platforms-download@cn,DIRECT",
-  "GEOSITE,category-ai-!cn,ai",
-  "GEOSITE,telegram,tg",
-  "GEOSITE,gfw,main",
-  "GEOSITE,cn,DIRECT",
-  "GEOIP,CN,DIRECT,no-resolve",
+  "RULE-SET,microsoft@cn,DIRECT",
+  "RULE-SET,category-game-platforms-download@cn,DIRECT",
+  "RULE-SET,category-ai-!cn,ai",
+  "RULE-SET,telegram,tg",
+  "RULE-SET,gfw,main",
+  "RULE-SET,cn,DIRECT",
+  "RULE-SET,cn-ip,DIRECT,no-resolve",
   "MATCH,main"
 ];
 
@@ -302,14 +330,12 @@ const buildProxyGroups = ({
     add("main", "select", mainEntries, "Available.png");
 
     add("URL Test - All", "url-test", allNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
-    add("BetterFB - All", "url-test", allNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
-    add("All", "select", ["BetterFB - All", "URL Test - All", ...allNames], "Available.png");
+    add("All", "select", ["URL Test - All", ...allNames], "Available.png");
   }
 
   if (aiNames.length) {
     add("URL Test - ai", "url-test", aiNames, "ChatGPT.png", SETTINGS.URL_TEST_EXTRA);
-    add("BetterFB - ai", "url-test", aiNames, "ChatGPT.png", SETTINGS.BETTER_FB_EXTRA);
-    add("ai", "select", ["BetterFB - ai", "URL Test - ai", ...aiNames], "ChatGPT.png");
+    add("ai", "select", ["URL Test - ai", ...aiNames], "ChatGPT.png");
   }
 
   if (allNames.length) {
@@ -323,14 +349,12 @@ const buildProxyGroups = ({
     if (!region) return;
 
     add(`URL Test - ${region.name}`, "url-test", region.proxies, region.icon, SETTINGS.URL_TEST_EXTRA);
-    add(`BetterFB - ${region.name}`, "url-test", region.proxies, region.icon, SETTINGS.BETTER_FB_EXTRA);
-    add(region.name, "select", [`BetterFB - ${region.name}`, `URL Test - ${region.name}`, ...region.proxies], region.icon);
+    add(region.name, "select", [`URL Test - ${region.name}`, ...region.proxies], region.icon);
   });
 
   if (otherProxyNames.length) {
     add("URL Test - Other", "url-test", otherProxyNames, "Available.png", SETTINGS.URL_TEST_EXTRA);
-    add("BetterFB - Other", "url-test", otherProxyNames, "Available.png", SETTINGS.BETTER_FB_EXTRA);
-    add("Other", "select", ["BetterFB - Other", "URL Test - Other", ...otherProxyNames], "Available.png");
+    add("Other", "select", ["URL Test - Other", ...otherProxyNames], "Available.png");
   }
 
   if (infoNames.length) {
@@ -356,15 +380,11 @@ const buildProxyGroups = ({
 // ====================
 // 6. 网络配置
 // ====================
-const applyGeoData = (cfg) => {
-  cfg["geodata-mode"] = true;
-  cfg["geo-auto-update"] = true;
-  cfg["geo-update-interval"] = 24;
-  cfg["geox-url"] = {
-    ...(cfg["geox-url"] || {}),
-    geoip: SETTINGS.GEOIP_URL,
-    geosite: SETTINGS.GEOSITE_URL
-  };
+const removeGeoDataConfig = (cfg) => {
+  delete cfg["geodata-mode"];
+  delete cfg["geo-auto-update"];
+  delete cfg["geo-update-interval"];
+  delete cfg["geox-url"];
 };
 
 const applySniffer = (cfg) => {
@@ -406,28 +426,28 @@ const applyDns = (cfg) => {
 
   const foreignDNS =["https://1.1.1.1/dns-query#main"];
 
-  const directGeoForChinaDNS =[
-    "geosite:cn",
-    "geosite:google-cn",
-    "geosite:synology",
-    "geosite:googlefcm",
-    "geosite:epicgames",
-    "geosite:nvidia@cn",
-    "geosite:microsoft@cn",
-    "geosite:cloudflare@cn",
-    "geosite:steam@cn",
-    "geosite:category-game-platforms-download@cn",
-    "geosite:category-ntp",
-    "geosite:connectivity-check",
-    "geosite:apple",
-    "geosite:spotify",
-    "geosite:microsoft"
+  const directRuleSetsForChinaDNS =[
+    "rule-set:cn",
+    "rule-set:google-cn",
+    "rule-set:synology",
+    "rule-set:googlefcm",
+    "rule-set:epicgames",
+    "rule-set:nvidia@cn",
+    "rule-set:microsoft@cn",
+    "rule-set:cloudflare@cn",
+    "rule-set:steam@cn",
+    "rule-set:category-game-platforms-download@cn",
+    "rule-set:category-ntp",
+    "rule-set:connectivity-check",
+    "rule-set:apple",
+    "rule-set:spotify",
+    "rule-set:microsoft"
   ];
 
   const fullFakeIpFilter = uniq([
     "+.cn",
-    "geosite:private",
-    ...directGeoForChinaDNS,
+    "rule-set:private",
+    ...directRuleSetsForChinaDNS,
     ...STATIC_FAKE_IP_FILTER,
     ...fakeIpFilterFromCfg
   ]);
@@ -485,7 +505,11 @@ function main(config) {
   const originalProxies = getOriginalProxies(config);
   const existingRules = Array.isArray(config.rules) ? config.rules : [];
 
-  delete config["rule-providers"];
+  config["rule-providers"] = {
+    ...(config["rule-providers"] || {}),
+    ...buildRuleProviders()
+  };
+
   config.rules = mergeRules(STATIC_RULES, pickDirectRules(existingRules));
 
   if (originalProxies.length) {
@@ -521,7 +545,7 @@ function main(config) {
     config.proxies = originalProxies;
   }
 
-  applyGeoData(config);
+  removeGeoDataConfig(config);
   applyRuntime(config);
   applySniffer(config);
   applyTun(config);
