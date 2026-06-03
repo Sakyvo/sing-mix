@@ -16,7 +16,7 @@ const FORCE_PROXY_DOMAINS = [
 // 1. 常量配置
 // ====================
 const SETTINGS = {
-  ICON_BASE: "https://cdn.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/",
+  ICON_BASE: "https://fastly.jsdelivr.net/gh/Koolson/Qure@master/IconSet/Color/",
   RULE_PROVIDER_URL_BASE: "https://fastly.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo",
 
   REGION_ORDER:["HK", "TW", "SG", "JP", "KR", "AS", "US"],
