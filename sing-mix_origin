@@ -1,5 +1,13 @@
+/**
+ * The sing-mix project
+ * Sakyvo Present
+ * 仓库地址：https://github.com/Sakyvo/sing-mix
+ * 脚本链接：https://raw.githubusercontent.com/Sakyvo/sing-mix/refs/heads/main/sing-mix_origin
+ * mihomo客户端推荐：https://github.com/appshubcc/Bettbox
+ */
+
 // ====================
-// 0. 特殊处理(手动添加)
+// 0. 特殊处理
 // ====================
 
 // 强制直连
@@ -13,7 +21,7 @@ const FORCE_PROXY_DOMAINS = [
 ];
 
 // 自定义节点过滤（用 | 分割)
-const CUSTOM_FILTER = /示例占位符1|示例占位符2|示例占位符3|/i;
+const CUSTOM_FILTER = /示例占位符1|示例占位符2|示例占位符3/i;
 
 // ====================
 // 1. 常量配置
